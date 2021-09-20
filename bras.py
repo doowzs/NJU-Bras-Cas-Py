@@ -17,6 +17,7 @@ data = {
 }
 
 encrypt_url = r'https://authserver.nju.edu.cn/authserver/custom/js/encrypt.js'
+login_url = r'https://authserver.nju.edu.cn/authserver/login'
 info_url = r'http://p.nju.edu.cn/api/portal/v1/getinfo'
 auth_url = r'http://p.nju.edu.cn/cas/'
 
@@ -40,13 +41,6 @@ def authenticate(session: requests.session) -> None:
     context = EvalJs()
     context.execute(js=response.text)
 
-    response = session.get(auth_url, allow_redirects=False)
-    if response.status_code != 302:
-        raise IOError('CAS login returned code {} instead of 302'.format(response.status_code))
-    login_url = response.headers['Location']
-    if login_url.startswith('http://'):
-        login_url = 'https' + login_url[4:]
-    
     response = session.get(login_url)
     if response.status_code != 200:
         raise IOError('Cannot get login page (code={})'.format(response.status_code))
@@ -64,15 +58,14 @@ def authenticate(session: requests.session) -> None:
         }
     except Exception:
         raise
-    
-    response = session.post(login_url, data, allow_redirects=False)
-    if response.status_code != 302:
-        raise IOError('Cannot post login page (code={}): {}'.format(response.status_code, repr(data)))
-    callback_url = response.headers['Location']
 
-    response = session.get(callback_url, allow_redirects=False)
-    if response.status_code != 302:
-        raise IOError('CAS callback returned code {} instead of 302'.format(response.status_code))
+    response = session.post(login_url, data)
+    if response.status_code != 200:
+        raise IOError('Cannot post login page (code={}): {}'.format(response.status_code, repr(data)))
+
+    response = session.get(auth_url)
+    if response.status_code != 200:
+        raise IOError('CAS returned code {} instead of 200'.format(response.status_code))
     logger.debug('CAS login success')
 
 
